@@ -1,13 +1,16 @@
 package unrealengine
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/pkg/errors"
-	"golang.org/x/text/encoding/unicode"
+	"golang.org/x/net/html/charset"
+	"golang.org/x/text/encoding"
 	"golang.org/x/text/transform"
 )
 
@@ -66,8 +69,12 @@ func GetEngineVersionData(enginePath string) (EngineBuildFile, error) {
 	if err != nil {
 		return EngineBuildFile{}, errors.Wrap(err, "failed to read build version file")
 	}
+	encoding, _, _, err := determineEncodingFromReader(bytes.NewReader(buildVersionData), len(buildVersionData))
+	if err != nil {
+		return EngineBuildFile{}, errors.Wrap(err, "failed to determine encoding")
+	}
 
-	reader := transform.NewReader(bytes.NewReader(buildVersionData), unicode.UTF16(unicode.LittleEndian, unicode.UseBOM).NewDecoder())
+	reader := transform.NewReader(bytes.NewReader(buildVersionData), encoding.NewDecoder())
 
 	var buildVersion EngineBuildFile
 	if err := json.NewDecoder(reader).Decode(&buildVersion); err != nil {
@@ -75,4 +82,18 @@ func GetEngineVersionData(enginePath string) (EngineBuildFile, error) {
 	}
 
 	return buildVersion, nil
+}
+
+func determineEncodingFromReader(r io.Reader, size int) (e encoding.Encoding, name string, certain bool, err error) {
+	peekSize := 1024
+	if size < peekSize {
+		peekSize = size
+	}
+	b, err := bufio.NewReader(r).Peek(peekSize)
+	if err != nil {
+		return
+	}
+
+	e, name, certain = charset.DetermineEncoding(b, "")
+	return
 }
