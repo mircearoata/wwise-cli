@@ -49,10 +49,15 @@ func IntegrateWwiseUnreal(uprojectFilePath string, integrationVersion string, ww
 
 	integrationFiles := versionInfo.FindFilesByGroups([]product.GroupFilter{
 		{GroupID: "DeploymentPlatforms", GroupValues: []string{wwiseUEDeploymentPlatform}},
+		{GroupID: "Packages", GroupValues: []string{"Unreal"}},
 	})
 
-	if len(integrationFiles) != 1 {
+	if len(integrationFiles) == 0 {
 		return errors.New("failed to find integration file")
+	}
+
+	if len(integrationFiles) > 1 {
+		return errors.New("found more than one integration file")
 	}
 
 	err = ueIntegrationVersion.DownloadOrCache(integrationFiles[0])
