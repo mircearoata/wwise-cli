@@ -11,8 +11,25 @@ type SupportedUnrealVersions struct {
 	Major int `json:"major"`
 	Minor int `json:"minor"`
 }
+
+type SdkPlatformFolderInfoEngineVersion struct {
+	Major string `json:"major"`
+	Minor string `json:"minor"`
+}
+
+type SdkPlatformFoldersInfo struct {
+	Destination         string                              `json:"destination"`
+	FileMatchExpression string                              `json:"fileMatchExpression"`
+	Optional            bool                                `json:"optional"`
+	Source              string                              `json:"source"`
+	UntilEngine         *SdkPlatformFolderInfoEngineVersion `json:"untilEngine,omitempty"`
+	SinceEngine         *SdkPlatformFolderInfoEngineVersion `json:"sinceEngine ,omitempty"`
+}
+
+type SdkPlatformFolders = map[string][]SdkPlatformFoldersInfo
 type ProductDependentData struct {
-	PlatformFolders         PlatformFolders           `json:"platformFolders"`
+	PlatformFolders         *PlatformFolders          `json:"platformFolders"`
+	SdkPlatformFolders      *SdkPlatformFolders       `json:"sdkPlatformFolders"`
 	SupportedPlatforms      []string                  `json:"supportedPlatforms"`
 	SupportedUnrealVersions []SupportedUnrealVersions `json:"supportedUnrealVersions"`
 	WwiseSdkBuild           int                       `json:"wwiseSdkBuild"`

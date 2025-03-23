@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/mircearoata/wwise-cli/lib/unrealengine"
 	"github.com/mircearoata/wwise-cli/lib/wwise/client"
@@ -73,19 +74,85 @@ func IntegrateWwiseUnreal(uprojectFilePath string, integrationVersion string, ww
 		return errors.Wrap(err, "failed to get sdk version")
 	}
 
-	foldersToCopyThirdParty := []string{}
-
-	for _, folder := range versionInfo.ProductDependentData.PlatformFolders.Mandatory {
-		if _, err := os.Stat(filepath.Join(sdkProductVersion.Dir, "SDK", folder)); os.IsNotExist(err) {
-			return errors.New("failed to find mandatory folder: " + folder)
-		}
-		foldersToCopyThirdParty = append(foldersToCopyThirdParty, folder)
+	type SDKIntegrationAsset struct {
+		Source      string
+		Destination string
 	}
 
-	for _, folder := range versionInfo.ProductDependentData.PlatformFolders.Optional {
-		if _, err := os.Stat(filepath.Join(sdkProductVersion.Dir, "SDK", folder)); !os.IsNotExist(err) {
-			foldersToCopyThirdParty = append(foldersToCopyThirdParty, folder)
+	sdkAssets := []SDKIntegrationAsset{}
+
+	if versionInfo.ProductDependentData.PlatformFolders != nil {
+		for _, folder := range versionInfo.ProductDependentData.PlatformFolders.Mandatory {
+			if _, err := os.Stat(filepath.Join(sdkProductVersion.Dir, "SDK", folder)); os.IsNotExist(err) {
+				return errors.New("failed to find mandatory folder: " + folder)
+			}
+			sdkAssets = append(sdkAssets, SDKIntegrationAsset{
+				Source:      folder,
+				Destination: folder,
+			})
 		}
+
+		for _, folder := range versionInfo.ProductDependentData.PlatformFolders.Optional {
+			if _, err := os.Stat(filepath.Join(sdkProductVersion.Dir, "SDK", folder)); !os.IsNotExist(err) {
+				sdkAssets = append(sdkAssets, SDKIntegrationAsset{
+					Source:      folder,
+					Destination: folder,
+				})
+			}
+		}
+	} else if versionInfo.ProductDependentData.SdkPlatformFolders != nil {
+		for _, platformInfos := range *versionInfo.ProductDependentData.SdkPlatformFolders {
+			for _, platformInfo := range platformInfos {
+				// TODO: Use FileMatchExpression, but for now it seems like it's always "*"
+
+				if platformInfo.SinceEngine != nil {
+					major, err := strconv.Atoi(platformInfo.SinceEngine.Major)
+					if err != nil {
+						return errors.Wrap(err, "failed to parse major version")
+					}
+					minor, err := strconv.Atoi(platformInfo.SinceEngine.Minor)
+					if err != nil {
+						return errors.Wrap(err, "failed to parse minor version")
+					}
+					if engineBuild.MajorVersion < major || (engineBuild.MajorVersion == major && engineBuild.MinorVersion < minor) {
+						continue
+					}
+				}
+
+				if platformInfo.UntilEngine != nil {
+					major, err := strconv.Atoi(platformInfo.UntilEngine.Major)
+					if err != nil {
+						return errors.Wrap(err, "failed to parse major version")
+					}
+					minor, err := strconv.Atoi(platformInfo.UntilEngine.Minor)
+					if err != nil {
+						return errors.Wrap(err, "failed to parse minor version")
+					}
+					if engineBuild.MajorVersion > major || (engineBuild.MajorVersion == major && engineBuild.MinorVersion > minor) {
+						continue
+					}
+				}
+
+				if platformInfo.Optional {
+					if _, err := os.Stat(filepath.Join(sdkProductVersion.Dir, "SDK", platformInfo.Source)); !os.IsNotExist(err) {
+						sdkAssets = append(sdkAssets, SDKIntegrationAsset{
+							Source:      platformInfo.Source,
+							Destination: platformInfo.Destination,
+						})
+					}
+				} else {
+					if _, err := os.Stat(filepath.Join(sdkProductVersion.Dir, "SDK", platformInfo.Source)); os.IsNotExist(err) {
+						return errors.New("failed to find mandatory folder: " + platformInfo.Source)
+					}
+					sdkAssets = append(sdkAssets, SDKIntegrationAsset{
+						Source:      platformInfo.Source,
+						Destination: platformInfo.Destination,
+					})
+				}
+			}
+		}
+	} else {
+		return errors.New("failed to find platform folders")
 	}
 
 	integrationAssets, err := os.ReadDir(ueIntegrationVersion.Dir)
@@ -104,8 +171,8 @@ func IntegrateWwiseUnreal(uprojectFilePath string, integrationVersion string, ww
 	}
 
 	mainWwisePlugin := filepath.Join(projectRoot, "Plugins", "Wwise")
-	for _, folder := range foldersToCopyThirdParty {
-		err = cp.Copy(filepath.Join(sdkProductVersion.Dir, "SDK", folder), filepath.Join(mainWwisePlugin, "ThirdParty", folder))
+	for _, sdkAsset := range sdkAssets {
+		err = cp.Copy(filepath.Join(sdkProductVersion.Dir, "SDK", sdkAsset.Source), filepath.Join(mainWwisePlugin, "ThirdParty", sdkAsset.Destination))
 		if err != nil {
 			return errors.Wrap(err, "failed to copy third party files")
 		}
