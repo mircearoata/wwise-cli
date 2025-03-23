@@ -88,18 +88,24 @@ func IntegrateWwiseUnreal(uprojectFilePath string, integrationVersion string, ww
 		}
 	}
 
-	integrationCachePath := filepath.Join(ueIntegrationVersion.Dir, "Wwise")
-
-	projectRoot := filepath.Dir(uprojectFilePath)
-	destinationPath := filepath.Join(projectRoot, "Plugins", "Wwise")
-
-	err = cp.Copy(integrationCachePath, destinationPath)
+	integrationAssets, err := os.ReadDir(ueIntegrationVersion.Dir)
 	if err != nil {
-		return errors.Wrap(err, "failed to copy integration files")
+		return errors.Wrap(err, "failed to read integration cache path")
 	}
 
+	projectRoot := filepath.Dir(uprojectFilePath)
+	for _, entry := range integrationAssets {
+		if entry.IsDir() {
+			err = cp.Copy(filepath.Join(ueIntegrationVersion.Dir, entry.Name()), filepath.Join(projectRoot, "Plugins", entry.Name()))
+			if err != nil {
+				return errors.Wrapf(err, "failed to copy integration asset: %s", entry.Name())
+			}
+		}
+	}
+
+	mainWwisePlugin := filepath.Join(projectRoot, "Plugins", "Wwise")
 	for _, folder := range foldersToCopyThirdParty {
-		err = cp.Copy(filepath.Join(sdkProductVersion.Dir, "SDK", folder), filepath.Join(destinationPath, "ThirdParty", folder))
+		err = cp.Copy(filepath.Join(sdkProductVersion.Dir, "SDK", folder), filepath.Join(mainWwisePlugin, "ThirdParty", folder))
 		if err != nil {
 			return errors.Wrap(err, "failed to copy third party files")
 		}
