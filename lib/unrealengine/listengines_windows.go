@@ -1,6 +1,8 @@
 package unrealengine
 
 import (
+	"strings"
+
 	"github.com/pkg/errors"
 	"golang.org/x/sys/windows/registry"
 )
@@ -24,7 +26,11 @@ func listEngines() (map[string]string, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get registry value")
 		}
-		engines[value] = path
+		engineVersion := value
+		if strings.HasPrefix(engineVersion, "UE_") {
+			engineVersion = strings.Replace(engineVersion, "UE_", "", 1)
+		}
+		engines[engineVersion] = path
 	}
 
 	return engines, nil
