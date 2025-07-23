@@ -79,6 +79,7 @@ func (client *WwiseClient) SendRequest(method string, url string, body interface
 	}
 
 	request.Header.Set("Authorization", "Bearer "+client.auth)
+	request.Header.Set("X-client-version", "2025.1.0.5135")
 
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
