@@ -32,7 +32,17 @@ func (client *WwiseClient) Authenticate(email string, password string) error {
 	}
 
 	if response.StatusCode != 200 {
-		return errors.New("failed to authenticate")
+		var responseJson struct {
+			Code    int    `json:"code"`
+			Err     string `json:"err"`
+			ErrCode string `json:"errCode"`
+			Random  string `json:"random"`
+		}
+		err = json.NewDecoder(response.Body).Decode(&responseJson)
+		if err != nil {
+			return errors.Wrap(err, "failed to decode auth error response")
+		}
+		return fmt.Errorf("failed to authenticate: %s (error_code: %s)", responseJson.Err, responseJson.ErrCode)
 	}
 
 	var responseJson struct {
