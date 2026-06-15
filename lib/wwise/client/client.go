@@ -26,7 +26,7 @@ func (client *WwiseClient) Authenticate(email string, password string) error {
 		return errors.Wrap(err, "failed to marshal auth json")
 	}
 
-	response, err := http.Post("https://www.audiokinetic.com/api/login", "application/json", bytes.NewBuffer(bodyJson))
+	response, err := http.Post("https://www.audiokinetic.com/wwise/launcher/?action=login", "application/json", bytes.NewBuffer(bodyJson))
 	if err != nil {
 		return errors.Wrap(err, "failed to post auth request")
 	}
@@ -45,13 +45,24 @@ func (client *WwiseClient) Authenticate(email string, password string) error {
 		return fmt.Errorf("failed to authenticate: %s (error_code: %s)", responseJson.Err, responseJson.ErrCode)
 	}
 
+	var responseContent apiResponse
+	err = json.NewDecoder(response.Body).Decode(&responseContent)
+	if err != nil {
+		return errors.Wrap(err, "failed to decode raw auth response")
+	}
+
+	responsePayload, err := responseContent.decodePayload()
+	if err != nil {
+		return errors.Wrap(err, "failed to decode auth response payload")
+	}
+
 	var responseJson struct {
 		Code          int    `json:"code"`
 		Jwt           string `json:"jwt"`
 		SpecialAction bool   `json:"specialAction"`
 		Random        string `json:"random"`
 	}
-	err = json.NewDecoder(response.Body).Decode(&responseJson)
+	err = json.Unmarshal([]byte(responsePayload), &responseJson)
 	if err != nil {
 		return errors.Wrap(err, "failed to decode auth response")
 	}
