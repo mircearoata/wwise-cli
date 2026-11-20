@@ -13,10 +13,7 @@ import (
 func ExtractTarXz(xzStream io.Reader, extractPath string) error {
 	uncompressedStream, err := xz.NewReader(xzStream)
 	if err != nil {
-		return errors.Wrap(err, "failed to create gzip reader")
-	}
-	if err != nil {
-		return errors.Wrap(err, "failed to create tar reader")
+		return errors.Wrap(err, "failed to create xz reader")
 	}
 
 	tarReader := tar.NewReader(uncompressedStream)
