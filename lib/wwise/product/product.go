@@ -1,6 +1,7 @@
 package product
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -151,7 +152,9 @@ func (v *WwiseProductVersion) DownloadOrCache(file File) error {
 	}
 	defer fileResp.Body.Close()
 
-	err = utils.ExtractTarXz(fileResp.Body, v.Dir)
+	reader := bufio.NewReaderSize(fileResp.Body, 5*1024*1024)
+
+	err = utils.ExtractTarXz(reader, v.Dir)
 	if err != nil {
 		return fmt.Errorf("failed to extract integration file: %w", err)
 	}
