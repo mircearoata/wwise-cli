@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -141,7 +142,11 @@ func (v *WwiseProductVersion) GetInfo() (ProductVersionInfo, error) {
 	return data.Data, nil
 }
 
-func (v *WwiseProductVersion) DownloadOrCache(file File) error {
+func (v *WwiseProductVersion) IsFileDownloaded(file string) bool {
+	return v.downloadedInfo.IsFileDownloaded(file)
+}
+
+func (v *WwiseProductVersion) DownloadOrCache(file File, progressWriter io.Writer) error {
 	if v.downloadedInfo.IsFileDownloaded(file.Name) {
 		return nil
 	}
@@ -152,7 +157,15 @@ func (v *WwiseProductVersion) DownloadOrCache(file File) error {
 	}
 	defer fileResp.Body.Close()
 
-	reader := bufio.NewReaderSize(fileResp.Body, 5*1024*1024)
+	if fileResp.StatusCode != http.StatusOK {
+		return fmt.Errorf("download failed: %s returned status %d (%s)", file.Name, fileResp.StatusCode, fileResp.Status)
+	}
+
+	var reader io.Reader = fileResp.Body
+	if progressWriter != nil {
+		reader = io.TeeReader(reader, progressWriter)
+	}
+	reader = bufio.NewReaderSize(reader, 5*1024*1024)
 
 	err = utils.ExtractTarXz(reader, v.Dir)
 	if err != nil {
@@ -166,7 +179,9 @@ func (v *WwiseProductVersion) DownloadOrCache(file File) error {
 		}
 		v.downloadedInfo.Groups = append(v.downloadedInfo.Groups, group)
 	}
-	v.Save()
+	if err := v.Save(); err != nil {
+		return fmt.Errorf("failed to save downloaded info: %w", err)
+	}
 
 	return nil
 }

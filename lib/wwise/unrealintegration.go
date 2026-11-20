@@ -10,6 +10,8 @@ import (
 	"github.com/mircearoata/wwise-cli/lib/unrealengine"
 	"github.com/mircearoata/wwise-cli/lib/wwise/client"
 	"github.com/mircearoata/wwise-cli/lib/wwise/product"
+	"github.com/mircearoata/wwise-cli/utils"
+	"github.com/schollz/progressbar/v3"
 
 	cp "github.com/otiai10/copy"
 )
@@ -22,6 +24,8 @@ func IntegrateWwiseUnreal(uprojectFilePath string, integrationVersion string, ww
 	if _, err := os.Stat(uprojectFilePath); os.IsNotExist(err) {
 		return fmt.Errorf("project path does not exist: %w", err)
 	}
+
+	fmt.Printf("Fetching Unreal Engine integration manifest for %s...\n", integrationVersion)
 
 	ueIntegrationProduct := product.NewWwiseProduct(wwiseClient, "unrealintegration")
 
@@ -61,9 +65,29 @@ func IntegrateWwiseUnreal(uprojectFilePath string, integrationVersion string, ww
 		return errors.New("found more than one integration file")
 	}
 
-	err = ueIntegrationVersion.DownloadOrCache(integrationFiles[0])
-	if err != nil {
-		return fmt.Errorf("failed to download integration file: %w", err)
+	file := integrationFiles[0]
+	if ueIntegrationVersion.IsFileDownloaded(file.Name) {
+		fmt.Printf("[Cached] Integration package %s is already downloaded\n", file.Name)
+	} else {
+		isTTY := utils.IsTTY()
+		var bar *progressbar.ProgressBar
+		if isTTY {
+			bar = utils.NewDownloadProgressBar(os.Stdout, int64(file.Size), fmt.Sprintf("Downloading integration package %s", file.Name))
+		} else {
+			fmt.Printf("Downloading integration package %s (%s)...\n", file.Name, utils.FormatBytes(int64(file.Size)))
+		}
+		err = ueIntegrationVersion.DownloadOrCache(file, bar)
+		if err != nil {
+			if bar != nil {
+				bar.Exit()
+			}
+			return fmt.Errorf("failed to download integration file: %w", err)
+		}
+		if bar != nil {
+			bar.Finish()
+		} else {
+			fmt.Printf("Completed downloading %s\n", file.Name)
+		}
 	}
 
 	wwiseSDKVersion := fmt.Sprintf("%d.%d.%d.%d", versionInfo.Version.Year, versionInfo.Version.Major, versionInfo.Version.Minor, versionInfo.ProductDependentData.WwiseSdkBuild)
@@ -160,6 +184,7 @@ func IntegrateWwiseUnreal(uprojectFilePath string, integrationVersion string, ww
 		return fmt.Errorf("failed to read integration cache path: %w", err)
 	}
 
+	fmt.Println("Copying Unreal Engine integration plugin files to project...")
 	projectRoot := filepath.Dir(uprojectFilePath)
 	for _, entry := range integrationAssets {
 		if entry.IsDir() {
@@ -170,6 +195,7 @@ func IntegrateWwiseUnreal(uprojectFilePath string, integrationVersion string, ww
 		}
 	}
 
+	fmt.Println("Copying SDK third-party files to Wwise plugin...")
 	mainWwisePlugin := filepath.Join(projectRoot, "Plugins", "Wwise")
 	for _, sdkAsset := range sdkAssets {
 		err = cp.Copy(filepath.Join(sdkProductVersion.Dir, "SDK", sdkAsset.Source), filepath.Join(mainWwisePlugin, "ThirdParty", sdkAsset.Destination))
@@ -178,5 +204,6 @@ func IntegrateWwiseUnreal(uprojectFilePath string, integrationVersion string, ww
 		}
 	}
 
+	fmt.Println("Unreal Engine integration completed successfully!")
 	return nil
 }
