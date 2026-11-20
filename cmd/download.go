@@ -55,7 +55,7 @@ var downloadCmd = &cobra.Command{
 		files := sdkVersionInfo.FindFilesByGroups(groupFilter)
 
 		for _, file := range files {
-			fmt.Printf("Downloading %v from %v\n", file.Name, file.URL)
+			fmt.Printf("Downloading %v\n", file.Name)
 			err = sdkProductVersion.DownloadOrCache(file)
 			if err != nil {
 				return errors.Wrapf(err, "could not download file %v", file.Name)
