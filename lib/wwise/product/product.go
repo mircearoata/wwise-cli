@@ -2,6 +2,7 @@ package product
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -9,7 +10,6 @@ import (
 
 	"github.com/mircearoata/wwise-cli/lib/wwise/client"
 	"github.com/mircearoata/wwise-cli/utils"
-	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 )
 
@@ -28,7 +28,7 @@ func NewWwiseProduct(client *client.WwiseClient, productName string) *WwiseProdu
 func (p *WwiseProduct) GetInfo() (ProductInfo, error) {
 	payload, err := p.Client.SendRequest("GET", "/products/versions/?category="+p.ProductName, nil)
 	if err != nil {
-		return ProductInfo{}, errors.Wrap(err, "failed to get product info")
+		return ProductInfo{}, fmt.Errorf("failed to get product info: %w", err)
 	}
 
 	var data struct {
@@ -36,7 +36,7 @@ func (p *WwiseProduct) GetInfo() (ProductInfo, error) {
 	}
 	err = json.Unmarshal([]byte(payload), &data)
 	if err != nil {
-		return ProductInfo{}, errors.Wrap(err, "failed to unmarshal product info")
+		return ProductInfo{}, fmt.Errorf("failed to unmarshal product info: %w", err)
 	}
 
 	return data.Data, nil
@@ -56,7 +56,7 @@ func (p *WwiseProduct) GetVersion(version string) (*WwiseProductVersion, error) 
 	}
 	err := pv.readDownloadedInfo()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to read downloaded info")
+		return nil, fmt.Errorf("failed to read downloaded info: %w", err)
 	}
 
 	return pv, nil
@@ -74,11 +74,11 @@ func (v *WwiseProductVersion) Save() error {
 
 	infoJson, err := json.MarshalIndent(v.downloadedInfo, "", "  ")
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal downloaded info")
+		return fmt.Errorf("failed to marshal downloaded info: %w", err)
 	}
 
 	if err := os.WriteFile(file, infoJson, 0755); err != nil {
-		return errors.Wrap(err, "failed to write downloaded info")
+		return fmt.Errorf("failed to write downloaded info: %w", err)
 	}
 	return nil
 }
@@ -89,23 +89,23 @@ func (v *WwiseProductVersion) readDownloadedInfo() error {
 	_, err := os.Stat(file)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return errors.Wrap(err, "failed to stat downloaded info file")
+			return fmt.Errorf("failed to stat downloaded info file: %w", err)
 		}
 
 		_, err := os.Stat(v.Dir)
 		if err != nil {
 			if !os.IsNotExist(err) {
-				return errors.Wrap(err, "failed to read cache directory")
+				return fmt.Errorf("failed to read cache directory: %w", err)
 			}
 
 			err = os.MkdirAll(v.Dir, 0755)
 			if err != nil {
-				return errors.Wrap(err, "failed to create cache directory")
+				return fmt.Errorf("failed to create cache directory: %w", err)
 			}
 		}
 
 		if err := v.Save(); err != nil {
-			return errors.Wrap(err, "failed to save empty downloaded info")
+			return fmt.Errorf("failed to save empty downloaded info: %w", err)
 		}
 
 		return nil
@@ -113,11 +113,11 @@ func (v *WwiseProductVersion) readDownloadedInfo() error {
 
 	downloadedInfoData, err := os.ReadFile(file)
 	if err != nil {
-		return errors.Wrap(err, "failed to read downloaded info")
+		return fmt.Errorf("failed to read downloaded info: %w", err)
 	}
 
 	if err := json.Unmarshal(downloadedInfoData, v.downloadedInfo); err != nil {
-		return errors.Wrap(err, "failed to unmarshal downloaded info")
+		return fmt.Errorf("failed to unmarshal downloaded info: %w", err)
 	}
 
 	return nil
@@ -126,7 +126,7 @@ func (v *WwiseProductVersion) readDownloadedInfo() error {
 func (v *WwiseProductVersion) GetInfo() (ProductVersionInfo, error) {
 	payload, err := v.Product.Client.SendRequest("GET", "/products/versions/"+v.Product.ProductName+"."+strings.ReplaceAll(v.VersionId, ".", "_"), nil)
 	if err != nil {
-		return ProductVersionInfo{}, errors.Wrap(err, "failed to get product version info")
+		return ProductVersionInfo{}, fmt.Errorf("failed to get product version info: %w", err)
 	}
 
 	var data struct {
@@ -134,7 +134,7 @@ func (v *WwiseProductVersion) GetInfo() (ProductVersionInfo, error) {
 	}
 	err = json.Unmarshal([]byte(payload), &data)
 	if err != nil {
-		return ProductVersionInfo{}, errors.Wrap(err, "failed to unmarshal product version info")
+		return ProductVersionInfo{}, fmt.Errorf("failed to unmarshal product version info: %w", err)
 	}
 
 	return data.Data, nil
@@ -147,13 +147,13 @@ func (v *WwiseProductVersion) DownloadOrCache(file File) error {
 
 	fileResp, err := http.Get(file.URL)
 	if err != nil {
-		return errors.Wrap(err, "failed to download integration file")
+		return fmt.Errorf("failed to download integration file: %w", err)
 	}
 	defer fileResp.Body.Close()
 
 	err = utils.ExtractTarXz(fileResp.Body, v.Dir)
 	if err != nil {
-		return errors.Wrap(err, "failed to extract integration file")
+		return fmt.Errorf("failed to extract integration file: %w", err)
 	}
 
 	v.downloadedInfo.Files = append(v.downloadedInfo.Files, file.Name)

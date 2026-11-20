@@ -4,11 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 
-	"github.com/pkg/errors"
 	"golang.org/x/net/html/charset"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/transform"
@@ -21,12 +22,12 @@ type UProject struct {
 func getEngineAssociationFromProject(projectPath string) (string, error) {
 	projectData, err := os.ReadFile(projectPath)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to read project file")
+		return "", fmt.Errorf("failed to read project file: %w", err)
 	}
 
 	var uproject UProject
 	if err := json.Unmarshal(projectData, &uproject); err != nil {
-		return "", errors.Wrap(err, "failed to unmarshal project file")
+		return "", fmt.Errorf("failed to unmarshal project file: %w", err)
 	}
 
 	return uproject.EngineAssociation, nil
@@ -35,12 +36,12 @@ func getEngineAssociationFromProject(projectPath string) (string, error) {
 func GetEngineRootFromProject(projectPath string) (string, error) {
 	engineAssociation, err := getEngineAssociationFromProject(projectPath)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to get engine association")
+		return "", fmt.Errorf("failed to get engine association: %w", err)
 	}
 
 	engines, err := listEngines()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to list engines")
+		return "", fmt.Errorf("failed to list engines: %w", err)
 	}
 
 	engineRoot, ok := engines[engineAssociation]
@@ -67,18 +68,18 @@ func GetEngineVersionData(enginePath string) (EngineBuildFile, error) {
 
 	buildVersionData, err := os.ReadFile(buildVersionFilePath)
 	if err != nil {
-		return EngineBuildFile{}, errors.Wrap(err, "failed to read build version file")
+		return EngineBuildFile{}, fmt.Errorf("failed to read build version file: %w", err)
 	}
 	encoding, _, _, err := determineEncodingFromReader(bytes.NewReader(buildVersionData), len(buildVersionData))
 	if err != nil {
-		return EngineBuildFile{}, errors.Wrap(err, "failed to determine encoding")
+		return EngineBuildFile{}, fmt.Errorf("failed to determine encoding: %w", err)
 	}
 
 	reader := transform.NewReader(bytes.NewReader(buildVersionData), encoding.NewDecoder())
 
 	var buildVersion EngineBuildFile
 	if err := json.NewDecoder(reader).Decode(&buildVersion); err != nil {
-		return EngineBuildFile{}, errors.Wrap(err, "failed to unmarshal build version file")
+		return EngineBuildFile{}, fmt.Errorf("failed to unmarshal build version file: %w", err)
 	}
 
 	return buildVersion, nil

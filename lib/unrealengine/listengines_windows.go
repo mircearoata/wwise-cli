@@ -1,16 +1,16 @@
 package unrealengine
 
 import (
+	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
 	"golang.org/x/sys/windows/registry"
 )
 
 func listEngines() (map[string]string, error) {
 	k, err := registry.OpenKey(registry.CURRENT_USER, `SOFTWARE\Epic Games\Unreal Engine\Builds`, registry.QUERY_VALUE)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to open registry key")
+		return nil, fmt.Errorf("failed to open registry key: %w", err)
 	}
 	defer k.Close()
 
@@ -18,13 +18,13 @@ func listEngines() (map[string]string, error) {
 
 	values, err := k.ReadValueNames(0)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to read registry values")
+		return nil, fmt.Errorf("failed to read registry values: %w", err)
 	}
 
 	for _, value := range values {
 		path, _, err := k.GetStringValue(value)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to get registry value")
+			return nil, fmt.Errorf("failed to get registry value: %w", err)
 		}
 		engineVersion := value
 		if strings.HasPrefix(engineVersion, "UE_") {

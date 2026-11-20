@@ -2,18 +2,18 @@ package utils
 
 import (
 	"archive/tar"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 
-	"github.com/pkg/errors"
-	"github.com/ulikunitz/xz"
+	"github.com/ulikunitz/xz/v2"
 )
 
 func ExtractTarXz(xzStream io.Reader, extractPath string) error {
 	uncompressedStream, err := xz.NewReader(xzStream)
 	if err != nil {
-		return errors.Wrap(err, "failed to create xz reader")
+		return fmt.Errorf("failed to create xz reader: %w", err)
 	}
 
 	tarReader := tar.NewReader(uncompressedStream)

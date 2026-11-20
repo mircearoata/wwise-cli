@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 
 	"github.com/mircearoata/wwise-cli/lib/wwise/client"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/term"
@@ -42,7 +41,7 @@ var rootCmd = &cobra.Command{
 
 		err := wwiseClient.Authenticate(email, password)
 		if err != nil {
-			return errors.Wrap(err, "authentication error. check your Wwise credentials")
+			return fmt.Errorf("authentication error. check your Wwise credentials: %w", err)
 		}
 
 		cmd.SetContext(NewContextWithClient(cmd.Context(), wwiseClient))

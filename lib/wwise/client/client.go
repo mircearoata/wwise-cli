@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 type WwiseClient struct {
@@ -23,12 +21,12 @@ func (client *WwiseClient) Authenticate(email string, password string) error {
 	body := map[string]string{"email": email, "password": password}
 	bodyJson, err := json.Marshal(body)
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal auth json")
+		return fmt.Errorf("failed to marshal auth json: %w", err)
 	}
 
 	response, err := http.Post("https://www.audiokinetic.com/wwise/launcher/?action=login", "application/json", bytes.NewBuffer(bodyJson))
 	if err != nil {
-		return errors.Wrap(err, "failed to post auth request")
+		return fmt.Errorf("failed to post auth request: %w", err)
 	}
 
 	if response.StatusCode != 200 {
@@ -40,7 +38,7 @@ func (client *WwiseClient) Authenticate(email string, password string) error {
 		}
 		err = json.NewDecoder(response.Body).Decode(&responseJson)
 		if err != nil {
-			return errors.Wrap(err, "failed to decode auth error response")
+			return fmt.Errorf("failed to decode auth error response: %w", err)
 		}
 		return fmt.Errorf("failed to authenticate: %s (error_code: %s)", responseJson.Err, responseJson.ErrCode)
 	}
@@ -48,12 +46,12 @@ func (client *WwiseClient) Authenticate(email string, password string) error {
 	var responseContent apiResponse
 	err = json.NewDecoder(response.Body).Decode(&responseContent)
 	if err != nil {
-		return errors.Wrap(err, "failed to decode raw auth response")
+		return fmt.Errorf("failed to decode raw auth response: %w", err)
 	}
 
 	responsePayload, err := responseContent.decodePayload()
 	if err != nil {
-		return errors.Wrap(err, "failed to decode auth response payload")
+		return fmt.Errorf("failed to decode auth response payload: %w", err)
 	}
 
 	var responseJson struct {
@@ -64,7 +62,7 @@ func (client *WwiseClient) Authenticate(email string, password string) error {
 	}
 	err = json.Unmarshal([]byte(responsePayload), &responseJson)
 	if err != nil {
-		return errors.Wrap(err, "failed to decode auth response")
+		return fmt.Errorf("failed to decode auth response: %w", err)
 	}
 
 	client.auth = responseJson.Jwt
@@ -80,7 +78,7 @@ type apiResponse struct {
 func (res apiResponse) decodePayload() (string, error) {
 	payloadBytes, err := base64.StdEncoding.DecodeString(res.Payload)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to decode payload")
+		return "", fmt.Errorf("failed to decode payload: %w", err)
 	}
 	return string(payloadBytes), nil
 }
@@ -88,7 +86,7 @@ func (res apiResponse) decodePayload() (string, error) {
 func (client *WwiseClient) SendRequest(method string, url string, body interface{}) (string, error) {
 	bodyJson, err := json.Marshal(body)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to marshal request body")
+		return "", fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
 	if !strings.HasPrefix(url, "https://blob-api.gowwise.com") {
@@ -96,7 +94,7 @@ func (client *WwiseClient) SendRequest(method string, url string, body interface
 	}
 	request, err := http.NewRequest(method, url, bytes.NewBuffer(bodyJson))
 	if err != nil {
-		return "", errors.Wrap(err, "failed to create request")
+		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
 	request.Header.Set("Authorization", "Bearer "+client.auth)
@@ -104,26 +102,26 @@ func (client *WwiseClient) SendRequest(method string, url string, body interface
 
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to send request")
+		return "", fmt.Errorf("failed to send request: %w", err)
 	}
 
 	if err != nil {
-		return "", errors.Wrap(err, "failed to get manifest")
+		return "", fmt.Errorf("failed to get manifest: %w", err)
 	}
 
 	if response.StatusCode != 200 {
-		return "", errors.New(fmt.Sprintf("failed to get %s (%d)", url, response.StatusCode))
+		return "", fmt.Errorf("failed to get %s (%d)", url, response.StatusCode)
 	}
 
 	var responseRaw apiResponse
 	err = json.NewDecoder(response.Body).Decode(&responseRaw)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to read response")
+		return "", fmt.Errorf("failed to read response: %w", err)
 	}
 
 	payload, err := responseRaw.decodePayload()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to decode payload")
+		return "", fmt.Errorf("failed to decode payload: %w", err)
 	}
 
 	return payload, nil

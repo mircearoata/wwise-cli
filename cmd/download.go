@@ -1,11 +1,11 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/mircearoata/wwise-cli/lib/wwise/product"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -39,12 +39,12 @@ var downloadCmd = &cobra.Command{
 		sdk := product.NewWwiseProduct(wwiseClient, "wwise")
 		sdkProductVersion, err := sdk.GetVersion(sdkVersion)
 		if err != nil {
-			return errors.Wrap(err, "could not get SDK version")
+			return fmt.Errorf("could not get SDK version: %v", err)
 		}
 
 		sdkVersionInfo, err := sdkProductVersion.GetInfo()
 		if err != nil {
-			return errors.Wrap(err, "could not get SDK version info")
+			return fmt.Errorf("could not get SDK version info: %v", err)
 		}
 
 		groupFilter := make([]product.GroupFilter, 0)
@@ -58,7 +58,7 @@ var downloadCmd = &cobra.Command{
 			fmt.Printf("Downloading %v\n", file.Name)
 			err = sdkProductVersion.DownloadOrCache(file)
 			if err != nil {
-				return errors.Wrapf(err, "could not download file %v", file.Name)
+				return fmt.Errorf("could not download file %v: %w", file.Name, err)
 			}
 		}
 

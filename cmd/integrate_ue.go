@@ -1,10 +1,10 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/mircearoata/wwise-cli/lib/wwise"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -25,7 +25,7 @@ var integrateUECmd = &cobra.Command{
 
 		err := wwise.IntegrateWwiseUnreal(project, integrationVersion, wwiseClient)
 		if err != nil {
-			return errors.Wrap(err, "could not integrate Wwise")
+			return fmt.Errorf("could not integrate Wwise: %w", err)
 		}
 
 		return nil

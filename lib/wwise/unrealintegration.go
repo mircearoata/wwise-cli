@@ -1,6 +1,7 @@
 package wwise
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,41 +10,40 @@ import (
 	"github.com/mircearoata/wwise-cli/lib/unrealengine"
 	"github.com/mircearoata/wwise-cli/lib/wwise/client"
 	"github.com/mircearoata/wwise-cli/lib/wwise/product"
-	"github.com/pkg/errors"
 
 	cp "github.com/otiai10/copy"
 )
 
 func IntegrateWwiseUnreal(uprojectFilePath string, integrationVersion string, wwiseClient *client.WwiseClient) error {
 	if filepath.Ext(uprojectFilePath) != ".uproject" {
-		return errors.New("invalid project path: " + uprojectFilePath)
+		return fmt.Errorf("invalid project path: %s", uprojectFilePath)
 	}
 
 	if _, err := os.Stat(uprojectFilePath); os.IsNotExist(err) {
-		return errors.Wrap(err, "project path does not exist")
+		return fmt.Errorf("project path does not exist: %w", err)
 	}
 
 	ueIntegrationProduct := product.NewWwiseProduct(wwiseClient, "unrealintegration")
 
 	ueIntegrationVersion, err := ueIntegrationProduct.GetVersion(integrationVersion)
 	if err != nil {
-		return errors.Wrap(err, "failed to get unreal integration version")
+		return fmt.Errorf("failed to get unreal integration version: %w", err)
 	}
 
 	versionInfo, err := ueIntegrationVersion.GetInfo()
 	if err != nil {
-		return errors.Wrap(err, "failed to get wwise manifest")
+		return fmt.Errorf("failed to get wwise manifest: %w", err)
 	}
 
 	// Get UE version from project file
 	engineRoot, err := unrealengine.GetEngineRootFromProject(uprojectFilePath)
 	if err != nil {
-		return errors.Wrap(err, "failed to get engine root")
+		return fmt.Errorf("failed to get engine root: %w", err)
 	}
 
 	engineBuild, err := unrealengine.GetEngineVersionData(engineRoot)
 	if err != nil {
-		return errors.Wrap(err, "failed to get engine build")
+		return fmt.Errorf("failed to get engine build: %w", err)
 	}
 
 	wwiseUEDeploymentPlatform := fmt.Sprintf("UE%d%d", engineBuild.MajorVersion, engineBuild.MinorVersion)
@@ -63,7 +63,7 @@ func IntegrateWwiseUnreal(uprojectFilePath string, integrationVersion string, ww
 
 	err = ueIntegrationVersion.DownloadOrCache(integrationFiles[0])
 	if err != nil {
-		return errors.Wrap(err, "failed to download integration file")
+		return fmt.Errorf("failed to download integration file: %w", err)
 	}
 
 	wwiseSDKVersion := fmt.Sprintf("%d.%d.%d.%d", versionInfo.Version.Year, versionInfo.Version.Major, versionInfo.Version.Minor, versionInfo.ProductDependentData.WwiseSdkBuild)
@@ -71,7 +71,7 @@ func IntegrateWwiseUnreal(uprojectFilePath string, integrationVersion string, ww
 	sdkProduct := product.NewWwiseProduct(wwiseClient, "wwise")
 	sdkProductVersion, err := sdkProduct.GetVersion(fmt.Sprintf("wwise.%s", wwiseSDKVersion))
 	if err != nil {
-		return errors.Wrap(err, "failed to get sdk version")
+		return fmt.Errorf("failed to get sdk version: %w", err)
 	}
 
 	type SDKIntegrationAsset struct {
@@ -84,7 +84,7 @@ func IntegrateWwiseUnreal(uprojectFilePath string, integrationVersion string, ww
 	if versionInfo.ProductDependentData.PlatformFolders != nil {
 		for _, folder := range versionInfo.ProductDependentData.PlatformFolders.Mandatory {
 			if _, err := os.Stat(filepath.Join(sdkProductVersion.Dir, "SDK", folder)); os.IsNotExist(err) {
-				return errors.New("failed to find mandatory folder: " + folder)
+				return fmt.Errorf("failed to find mandatory folder: %s", folder)
 			}
 			sdkAssets = append(sdkAssets, SDKIntegrationAsset{
 				Source:      folder,
@@ -108,11 +108,11 @@ func IntegrateWwiseUnreal(uprojectFilePath string, integrationVersion string, ww
 				if platformInfo.SinceEngine != nil {
 					major, err := strconv.Atoi(platformInfo.SinceEngine.Major)
 					if err != nil {
-						return errors.Wrap(err, "failed to parse major version")
+						return fmt.Errorf("failed to parse major version: %w", err)
 					}
 					minor, err := strconv.Atoi(platformInfo.SinceEngine.Minor)
 					if err != nil {
-						return errors.Wrap(err, "failed to parse minor version")
+						return fmt.Errorf("failed to parse minor version: %w", err)
 					}
 					if engineBuild.MajorVersion < major || (engineBuild.MajorVersion == major && engineBuild.MinorVersion < minor) {
 						continue
@@ -122,11 +122,11 @@ func IntegrateWwiseUnreal(uprojectFilePath string, integrationVersion string, ww
 				if platformInfo.UntilEngine != nil {
 					major, err := strconv.Atoi(platformInfo.UntilEngine.Major)
 					if err != nil {
-						return errors.Wrap(err, "failed to parse major version")
+						return fmt.Errorf("failed to parse major version: %w", err)
 					}
 					minor, err := strconv.Atoi(platformInfo.UntilEngine.Minor)
 					if err != nil {
-						return errors.Wrap(err, "failed to parse minor version")
+						return fmt.Errorf("failed to parse minor version: %w", err)
 					}
 					if engineBuild.MajorVersion > major || (engineBuild.MajorVersion == major && engineBuild.MinorVersion > minor) {
 						continue
@@ -142,7 +142,7 @@ func IntegrateWwiseUnreal(uprojectFilePath string, integrationVersion string, ww
 					}
 				} else {
 					if _, err := os.Stat(filepath.Join(sdkProductVersion.Dir, "SDK", platformInfo.Source)); os.IsNotExist(err) {
-						return errors.New("failed to find mandatory folder: " + platformInfo.Source)
+						return fmt.Errorf("failed to find mandatory folder: %s", platformInfo.Source)
 					}
 					sdkAssets = append(sdkAssets, SDKIntegrationAsset{
 						Source:      platformInfo.Source,
@@ -157,7 +157,7 @@ func IntegrateWwiseUnreal(uprojectFilePath string, integrationVersion string, ww
 
 	integrationAssets, err := os.ReadDir(ueIntegrationVersion.Dir)
 	if err != nil {
-		return errors.Wrap(err, "failed to read integration cache path")
+		return fmt.Errorf("failed to read integration cache path: %w", err)
 	}
 
 	projectRoot := filepath.Dir(uprojectFilePath)
@@ -165,7 +165,7 @@ func IntegrateWwiseUnreal(uprojectFilePath string, integrationVersion string, ww
 		if entry.IsDir() {
 			err = cp.Copy(filepath.Join(ueIntegrationVersion.Dir, entry.Name()), filepath.Join(projectRoot, "Plugins", entry.Name()))
 			if err != nil {
-				return errors.Wrapf(err, "failed to copy integration asset: %s", entry.Name())
+				return fmt.Errorf("failed to copy integration asset: %s: %w", entry.Name(), err)
 			}
 		}
 	}
@@ -174,7 +174,7 @@ func IntegrateWwiseUnreal(uprojectFilePath string, integrationVersion string, ww
 	for _, sdkAsset := range sdkAssets {
 		err = cp.Copy(filepath.Join(sdkProductVersion.Dir, "SDK", sdkAsset.Source), filepath.Join(mainWwisePlugin, "ThirdParty", sdkAsset.Destination))
 		if err != nil {
-			return errors.Wrap(err, "failed to copy third party files")
+			return fmt.Errorf("failed to copy third party files: %w", err)
 		}
 	}
 
