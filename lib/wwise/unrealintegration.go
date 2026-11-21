@@ -3,6 +3,7 @@ package wwise
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -76,7 +77,12 @@ func IntegrateWwiseUnreal(uprojectFilePath string, integrationVersion string, ww
 		} else {
 			fmt.Printf("Downloading integration package %s (%s)...\n", file.Name, utils.FormatBytes(int64(file.Size)))
 		}
-		err = ueIntegrationVersion.DownloadOrCache(file, bar)
+
+		var progressWriter io.Writer
+		if bar != nil {
+			progressWriter = bar
+		}
+		err = ueIntegrationVersion.DownloadOrCache(file, progressWriter)
 		if err != nil {
 			if bar != nil {
 				bar.Exit()

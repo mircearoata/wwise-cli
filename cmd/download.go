@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/mircearoata/wwise-cli/lib/wwise/product"
@@ -100,7 +101,11 @@ var downloadCmd = &cobra.Command{
 				fmt.Printf("Downloading [%d/%d] %s (%s)...\n", i+1, len(pendingFiles), file.Name, utils.FormatBytes(int64(file.Size)))
 			}
 
-			err = sdkProductVersion.DownloadOrCache(file, bar)
+			var progressWriter io.Writer
+			if bar != nil {
+				progressWriter = bar
+			}
+			err = sdkProductVersion.DownloadOrCache(file, progressWriter)
 			if err != nil {
 				if bar != nil {
 					bar.Exit()
